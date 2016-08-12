@@ -1,0 +1,27 @@
+<script type="text/javascript">
+    RED.nodes.registerType('sse',{
+        category: 'server',
+        color: '#a6bbcf',
+        defaults: {
+            name: {value:""},
+        },
+        inputs:1,
+        outputs:1,
+        label: function() {
+            return this.name||"Server-sent-event";
+        }
+    });
+</script>
+
+<script type="text/x-red" data-template-name="sse">
+    <div class="form-row">
+        <label for="node-input-name"><i class="icon-tag"></i> Name</label>
+        <input type="text" id="node-input-name" placeholder="Name">
+    </div>
+</script>
+
+<script type="text/x-red" data-help-name="sse">
+    <p>This Node will setup a server sent event rout on /sse
+    it will send the msg.payload to all the clients trying to
+    connect to this path</p>
+</script>
