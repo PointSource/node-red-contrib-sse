@@ -1,85 +1,106 @@
-/** 
-	A small modular that will keep a map of clients listening for more events
+/*
+ * Copyright (c) 2016 PointSource, LLC.
+ * MIT Licensed
+ */
+var sse = require('simple-sse'),
+    http = require('http');
 
-	developed by Nima Yahyazade 6/14/2015
-*/
-
-var SSE = require('sse')
-  , http = require('http')
-  , Connections = require('./connections.js');
-
-
-
-//============================================================================
 /**
-	Overriding the sshClient module
-	this was done in order to manage a cross-origin request
-	through EventSource
+ * The exported module for the Node-RED package to pick up 
+ * the sse node. It will register the sse node type.
+ * @param  {object} RED Required parameter for Node-RED
+ */
+module.exports = function(RED) {
+    /**
+     * @name CreateSSENode
+     * @description Will create the sse node and setup all the variable. 
+     * It will register.
+     * a http listener on the path and room inputed to the node.
+     * @param {object} config Configuration passed in from Node-RED library
+     */
+    function CreateSSENode(config) {
+        // Do the initialization for Node-RED
+        RED.nodes.createNode(this, config);
+        var node = this;
 
-	added :
-		'Access-Control-Allow-Origin': '*'
-*/
-var sseClient = SSE.Client;
-sseClient.prototype.initialize = function() {
-  this.req.socket.setNoDelay(true);
-  this.res.writeHead(200, {
-    'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
-    'Connection': 'keep-alive',
-    'Access-Control-Allow-Origin': '*'
-  });
-  this.res.write(':ok\n\n');
-};
+        // Initialize variables using the user inputs
+        var room = config.room;
+        var path = config.path + "/" + config.room;
+        var retry = config.retrySet !== undefined ? config.retry : undefined;
+        var accessAllowControlOrigin =
+            config.accessControlSet !== undefined ? config.accesscontrol : undefined;
+        var clientNums = 0;
+        sse.heartbeat = config.heartbeat;
 
-module.exports= function(RED) {
-    // will be called when the node is created
-    function CreateSSENode(config){
-      
-      RED.nodes.createNode(this,config);
+        // Set up the status Icon at the beginning
+        updateNode();
 
-      // create a new connection and add a listener for listening event
-      var connections = new Connections();
-      addSSEsupport(RED.server, connections);
+        // The route for specific path and room
+        RED.httpNode.get(path, function(req, res) {
+            if (accessAllowControlOrigin) {
+              res.setHeader('Access-Control-Allow-Origin', accessAllowControlOrigin)
+            }
+            clientNums++;
+            // create client sse
+            var client = sse.add(req, res);
 
-      var node = this;
-      // on input broad cast the massage to all clients
-      this.on('input', function(msg){
-      	connections.broadcastToAll(msg.payload);
-      	node.send({payload:connections.printConnections()});
-      });
+            // set sse retry
+            if (retry && retry > 0) {
+                sse.setRetry(client, config.retry);
+            }
 
+            // add to the room
+            sse.join(client, config.room);
 
+            // update the status Icon
+            updateNode();
+
+            req.connection.addListener("close", function() {
+                clientNums--;
+                updateNode();
+            });
+        });
+
+        // On input broadcast the massage to all clients
+        this.on('input', function(msg) {
+            if (msg.event) {
+                sse.broadcast(room, msg.event, msg.payload);
+            }
+            sse.broadcast(room, msg.payload);
+        });
+
+        // When closing remove the route listener
+        this.on("close", function() {
+            RED.httpNode._router.stack.forEach(function(route, i, routes) {
+                if (route.route &&
+                    route.route.path === path &&
+                    route.route.methods['get']) {
+                    routes.splice(i, 1);
+                }
+            });
+        });
+
+        /**
+         * @name updateNode
+         * @description Will update the status Icon of the node based on 
+         * number of clients
+         */
+        function updateNode() {
+            if (clientNums === 0) { // No client connected
+                node.status({
+                    fill: "red",
+                    shape: "ring",
+                    text: "disconnected"
+                });
+            } else {
+                node.status({
+                    fill: "green",
+                    shape: "dot",
+                    text: clientNums + " client(s) connected"
+                });
+            }
+        }
     }
-  RED.nodes.registerType("sse", CreateSSENode);
+
+    RED.nodes.registerType("sse", CreateSSENode);
 }
-
-	  
-
-
-//============================================================================
-/**
-	Adds the sse support to the given server. also removes
-		the client when it leaves the connection
-
-	Param:
-		Server has to be an instance of http.server
-		clientList an instance of Connections object
-*/
-function addSSEsupport(server, clientList){
-	var sse = new SSE(server);
-	sse.on('connection', function(client){
-		clientList.addConnection(client);	// add the client to the list
-		//clientList.printConnections(); debug
-
-		/* need to know when the client has closed the connection */
-    	client.on('close', function(){
-    		console.log("close requested cliendID: "+this.clientID);
- 			
- 			/* remove the client from client list */
- 			clientList.removeConnection(this);
-    	});
-	});
-}
-
-
-
