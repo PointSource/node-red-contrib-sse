@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2016 PointSource, LLC.
+ * MIT Licensed
+ */
 var sse = require('simple-sse'),
     http = require('http');
 
