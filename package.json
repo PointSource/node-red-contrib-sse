@@ -8,7 +8,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/PointSource/node-red-node-sse.git"
+    "url": "git+https://github.com/PointSource/node-red-contrib-sse.git"
   },
   "keywords": [
     "node-red",
@@ -22,12 +22,12 @@
   "author": "Nima Yahyazadeh",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/PointSource/node-red-node-sse/issues"
+    "url": "https://github.com/PointSource/node-red-contrib-sse/issues"
   },
   "contributors": [
     "Nima Yahyazdeh <nima.yahyazadeh@pointsource.com>"
   ],
-  "homepage": "https://github.com/PointSource/node-red-node-sse#readme",
+  "homepage": "https://github.com/PointSource/node-red-contrib-sse#readme",
   "dependencies": {
     "simple-sse": "0.0.3"
   }
