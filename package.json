@@ -19,7 +19,7 @@
       "sse": "src/sse.js"
     }
   },
-  "author": "Nima Yahyazadeh",
+  "author": "PointSource github@pointsource.com",
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/PointSource/node-red-contrib-sse/issues"
