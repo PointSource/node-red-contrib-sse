@@ -19,7 +19,7 @@
       "sse": "src/sse.js"
     }
   },
-  "author": "PointSource github@pointsource.com",
+  "author": "PointSource <github@pointsource.com>",
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/PointSource/node-red-contrib-sse/issues"
