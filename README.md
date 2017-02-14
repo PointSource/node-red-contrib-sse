@@ -6,6 +6,10 @@ To install run:
 
 `npm install node-red-contrib-sse --save`
 
+Until the module is not registered on npm use the following to install:
+
+`npm install PointSource/node-red-contrib-sse`
+
 ## Description
 
 This is a wrapper around [simple-sse](https://www.npmjs.com/package/simple-sse).
