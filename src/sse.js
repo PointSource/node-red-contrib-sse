@@ -24,11 +24,16 @@ module.exports = function(RED) {
         var node = this;
 
         // Initialize variables using the user inputs
-        var room = config.room;
-        var path = config.path + "/" + config.room;
-        var retry = config.retrySet !== undefined ? config.retry : undefined;
+        var path = config.path + "/";
+        path += config.anyRoomSet ? ':roomId' : config.room;
+        var retry = config.retrySet !== undefined && config.retrySet ?
+            config.retry : 1000;
+
         var accessAllowControlOrigin =
-            config.accessControlSet !== undefined ? config.accesscontrol : undefined;
+            config.accessControlSet !== undefined && config.accessControlSet ?
+            config.accesscontrol :
+            undefined;
+
         var clientNums = 0;
         sse.heartbeat = config.heartbeat;
 
@@ -38,7 +43,8 @@ module.exports = function(RED) {
         // The route for specific path and room
         RED.httpNode.get(path, function(req, res) {
             if (accessAllowControlOrigin) {
-              res.setHeader('Access-Control-Allow-Origin', accessAllowControlOrigin)
+                res.setHeader('Access-Control-Allow-Origin',
+                    accessAllowControlOrigin)
             }
             clientNums++;
             // create client sse
@@ -46,32 +52,52 @@ module.exports = function(RED) {
 
             // set sse retry
             if (retry && retry > 0) {
-                sse.setRetry(client, config.retry);
+                sse.setRetry(client, retry);
             }
 
-            // add to the room
-            sse.join(client, config.room);
+            // Add to the room. The room is found based on 
+            // whether the node is accepting any room or only
+            // a specific room.
+            var room = config.anyRoomSet ? req.params.roomId :
+                config.room;
+            sse.join(client, room);
 
             // update the status Icon
             updateNode();
 
+            // Reduce the client count on the client leaving the
+            // room.
             req.connection.addListener("close", function() {
                 clientNums--;
                 updateNode();
             });
         });
 
-        // On input broadcast the massage to all clients
+        // On input broadcast the massage to all clients. Again the decision
+        // to send to what specific room is based of whether this is a dynamic
+        // room node or a static one.
         this.on('input', function(msg) {
-            if (msg.event) {
-                sse.broadcast(room, msg.event, msg.payload);
+            var sendRoom;
+            if (config.anyRoomSet) {
+                sendRoom = msg.room !== undefined ? msg.room : '*';
+            } else {
+                sendRoom = config.room;
             }
-            sse.broadcast(room, msg.payload);
+
+            // Just in case if the room is int or float, convert.
+            sendRoom = String(sendRoom);
+
+            // Send it to right audience.
+            if (msg.event) {
+                sse.broadcast(sendRoom, msg.event, msg.payload);
+            }
+            sse.broadcast(sendRoom, msg.payload);
         });
 
         // When closing remove the route listener
         this.on("close", function() {
-            RED.httpNode._router.stack.forEach(function(route, i, routes) {
+            RED.httpNode._router.stack.forEach(function(route, i,
+                routes) {
                 if (route.route &&
                     route.route.path === path &&
                     route.route.methods['get']) {

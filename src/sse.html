@@ -19,8 +19,14 @@ RED.nodes.registerType('sse', {
         },
         room: {
             value: "",
-            validate: RED.validators.regex(/[a-z0-9]+/),
-            required: true
+            validate: function(v) {
+                v = v.trim();
+                return (v != null && v != '' && RED.validators.regex(/[a-z0-9]+/)(v)) ||
+                    this.anyRoomSet;
+            }
+        },
+        anyRoomSet: {
+            value: false
         },
         heartbeat: {
             value: 20000,
@@ -29,8 +35,11 @@ RED.nodes.registerType('sse', {
         },
         retry: {
             value: 1000,
+            validate: function(v) {
+                return RED.validators.number()(v) || !this.retrySet;
+            }
         },
-        retrySet:{
+        retrySet: {
             value: false
         },
         accesscontrol: {
@@ -46,59 +55,75 @@ RED.nodes.registerType('sse', {
         return this.name || "ServerSentEvent";
     },
     oneditprepare: function() {
+        var self = this;
         if (!this.accessControlSet) {
-            $(".node-input-accesscontrol").hide();
+            $("#node-input-accesscontrol").hide();
         } else {
             $("#isAllowAccessSelected").prop('checked', true);
-            $(".node-input-accesscontrol").val(this.accesscontrol);
+            $("#node-input-accesscontrol").val(this.accesscontrol);
         }
+
         if (!this.retrySet) {
-            $(".node-input-retry").hide();
-            $(".node-input-retry-scale").hide();
+            $("#node-input-retry").hide();
+            $("#node-input-retry-scale").hide();
         } else {
             $("#isRetrySelected").prop('checked', true);
-            $(".node-input-retry").val(this.retry);
+            $("#node-input-retry").val(this.retry);
         }
-        $('#isRetrySelected').click(function() {
-            if ($("#isRetrySelected").is(':checked')) { // checked
-                $(".node-input-retry").show();
-                $(".node-input-retry").text(this.retry);
-                $(".node-input-retry-scale").show();
+
+        if (this.anyRoomSet) {
+            $('#isAnyRoomAccepted').prop('checked', true);
+            $('#node-input-room').attr("disabled", "disabled");
+        }
+
+        $('#isAnyRoomAccepted').click(function() {
+            if ($("#isAnyRoomAccepted").is(':checked')) {
+                $('#node-input-room').attr("disabled","disabled");
             } else {
-                $(".node-input-retry").hide();
-                $(".node-input-retry-scale").hide();
+                $('#node-input-room').removeAttr("disabled");
             }
         });
+
+        $('#isRetrySelected').click(function() {
+            if ($("#isRetrySelected").is(':checked')) { // checked
+                $("#node-input-retry").show();
+                $("#node-input-retry").val(self.retry);
+                $("#node-input-retry-scale").show();
+            } else {
+                $("#node-input-retry").hide();
+                $("#node-input-retry-scale").hide();
+            }
+        });
+
         $('#isAllowAccessSelected').click(function() {
             if ($("#isAllowAccessSelected").is(':checked')) { // checked
-                $(".node-input-accesscontrol").show();
-                $(".node-input-accesscontrol").text(this.accesscontrol);
+                $("#node-input-accesscontrol").show();
+                $("#node-input-accesscontrol").text(self.accesscontrol);
             } else {
-                $(".node-input-accesscontrol").hide();
+                $("#node-input-accesscontrol").hide();
             }
         });
     },
-    oneditsave: function () {
+    oneditsave: function() {
+        this.anyRoomSet = $('#isAnyRoomAccepted').is(':checked');
+
         this.retrySet = $("#isRetrySelected").is(':checked');
-        if(this.retrySet) {
-            try {
-                this.retry = Number($(".node-input-retry").val());
-            } catch (e) {
-                this.retry = 1000;
-            }
+
+        try {
+            this.retry = Number($("#node-input-retry").val());
+        } catch (e) {
+            this.retry = 1000;
         }
+
         this.accessControlSet = $("#isAllowAccessSelected").is(':checked');
-        if(this.accessControlSet) {
-            this.accesscontrol = $(".node-input-accesscontrol").val();
-        } else {
-            this.accesscontrol = "";  
-        }
+        this.accesscontrol = $("#node-input-accesscontrol").val() || "";
     }
 });
 </script>
 <style>
-.node-input-retry {
-    margin-left: 110px;
+.node-input-retry,
+.node-input-room-any {
+    margin-left: 100px;
     margin-right: 10px;
 }
 
@@ -122,6 +147,10 @@ RED.nodes.registerType('sse', {
     <div class="form-row">
         <label for="node-input-room"><i class="icon-tag"></i> Room</label>
         <input type="text" id="node-input-room" placeholder="room1">
+        <div class="node-input-room-any form-row" style="margin-top: 10px;">
+            <input type="checkbox" id="isAnyRoomAccepted" style="width:20px;">
+            <span style="font-size: 12px; font-style: italic;">Accept any room</span>
+        </div>
     </div>
     <div class="form-row">
         <label for="node-input-heartbeat"><i class="icon-tag"></i> Heartbeat</label>
@@ -131,8 +160,9 @@ RED.nodes.registerType('sse', {
         <label for="node-input-retry"><i class="icon-tag"></i> Retry</label>
         <input type="checkbox" style="width: 20px;" id="isRetrySelected" />
         <div class="input-pop-up form-row">
-            <input type="text" class="node-input-retry" placeholder="1000" , style="width:100px;">
-            <label class="node-input-retry-scale"> Milliseconds</label>
+            <input type="text" id="node-input-retry" placeholder="1000" 
+            style="width:100px;">
+            <label id="node-input-retry-scale"> Milliseconds</label>
         </div>
     </div>
     <div class="form-row">
@@ -141,7 +171,8 @@ RED.nodes.registerType('sse', {
         </label>
         <input type="checkbox" style="width: 20px;" id="isAllowAccessSelected" />
         <div class="form-row input-pop-up">
-            <input type="text" class="node-input-accesscontrol" placeholder="http://example.com or *">
+            <input type="text" id="node-input-accesscontrol" 
+            placeholder="http://example.com or *">
         </div>
     </div>
     <div>
@@ -149,25 +180,51 @@ RED.nodes.registerType('sse', {
 </script>
 <script type="text/x-red" data-help-name="sse">
     <p>This is a wrapper node around
-        <a href="https://www.npmjs.com/package/simple-sse">simple-sse</a> package. It will allow sending sever sent event to the client.
+        <a href="https://www.npmjs.com/package/simple-sse">simple-sse</a> package.
+        It will allow sending sever sent event to the client.
         <br>
         <ul>
             <li>
-                Path : The base path that the will listen for incoming HTTP request. Can be any valid url path.</li>
-            <li>Room : Different rooms can be created to categorize different clients in order to be able to send a specific message to a group of clients.</li>
+                Path : The base path that the will listen for incoming HTTP 
+                request. Can be any valid url path.
+            </li>
+            <li>
+                Room : Different rooms can be created to categorize different 
+                clients in order to be able to send a specific message to a 
+                group of clients.
+            </li>
             <br>
             <big>Note: </big> The url for a specific room will be "
             <i>Path<big>/</big>Room</i>" for instance:
-            <i>http://example.com/sse/room1</i>
+            <i style="font-weight: bold;">http://example.com/sse/room1</i>.
             <br>
             <br>
-            <li>Hearbeat: Heartbeat will be used to send custom messages to the client when no data is being sent. Default delay to send a heartbeat is <i>20000</i> milliseconds but can be customized.
+            <big>Note: </big> If the <i>Accept any room</i> is selected, the 
+                node acts dynamically to choose the room. The client can
+                connect to any arbitrary room given the path i.e 
+                <i style="font-weight: bold;">http://example.com/sse/dynamicroom</i>. 
+                <code>this.room</code> can be used to distinguish what room 
+                the data is being sent to and if not present, data will be 
+                sent to all the clients connected to this node.
+            <br>
+            <br>
+            <li>
+                Heartbeat: Heartbeat will be used to send custom messages to 
+                the client when no data is being sent. Default delay to send 
+                a heartbeat is <i>20000</i> milliseconds but can be customized.
             </li>
-            <li>Retry: If selected will set the retry time for client at connection time.</li>
-            <li>AccessControlAllowOrigin: If could not connect using
-                <i>EventSource</i> due to access control allow origin header missing you can set the header here.</li>
+            <li>
+                Retry: By default retry is set to <i>1000<i> milliseconds 
+                right upon connection. If selected, can customize the retry.
+            </li>
+            <li>
+                AccessControlAllowOrigin: If could not connect using <i>EventSource</i>
+                due to access control allow origin header missing you can set the
+                header here.
+            </li>
             <br>
-            <big>Note: </big>Make sure you are aware of security risk if you set the origin to "*".
+            <big>Note: </big>Make sure you are aware of security risk if you set
+            the origin to "*".
         </ul>
         <br> Output of this nodes will be <code>msg.payload</code> as
         <br>
